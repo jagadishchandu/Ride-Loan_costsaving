@@ -187,7 +187,9 @@ async def sum_payments(loan_id: str) -> float:
 
 async def send_push(user_id: str, title: str, body: str, data: dict | None = None) -> None:
     user = await db.users.find_one({"user_id": user_id}, {"_id": 0, "expo_push_token": 1})
-    token = user.get("expo_push_token") if user else None
+    if not user:
+        return
+    token = user.get("expo_push_token")
     if not token:
         return
     message = {
@@ -416,6 +418,7 @@ async def create_loan(data: LoanIn, current_user: dict = Depends(get_current_use
         linked = await db.users.find_one({"email": data.counterparty_email.lower()}, {"_id": 0, "user_id": 1})
         if linked:
             linked_user_id = linked["user_id"]
+    initial_status = "pending_acceptance" if (data.request_acceptance and linked_user_id) else "active"
     loan = {
         "loan_id": loan_id,
         "mode": "public",
@@ -434,12 +437,17 @@ async def create_loan(data: LoanIn, current_user: dict = Depends(get_current_use
         "reminder_enabled": data.reminder_enabled,
         "reminder_day": data.reminder_day,
         "notes": data.notes,
-        "status": "active",
+        "status": initial_status,
         "created_at": datetime.now(timezone.utc),
         "updated_at": datetime.now(timezone.utc),
     }
     await db.loans.insert_one(loan.copy())
-    return serialize_loan(loan)
+    # Notify linked counterparty about new loan
+    if linked_user_id:
+        title = "New loan request" if initial_status == "pending_acceptance" else "New shared loan"
+        body = f"{current_user.get('name')} added a loan of \u20B9{data.principal_amount}"
+        await send_push(linked_user_id, title, body, {"loan_id": loan_id})
+    return serialize_loan(loan, total_paid=0.0)
 
 @api.get("/loans")
 async def list_loans(
