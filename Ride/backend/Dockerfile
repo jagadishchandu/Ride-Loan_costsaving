@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-WORKDIR /rideapp
+WORKDIR /app
 
 # System deps:
 #  - build-essential / gcc: a few wheels still compile on first install
@@ -19,4 +19,4 @@ RUN pip install --no-cache-dir --upgrade pip \
 COPY . .
 
 EXPOSE 8002
-CMD ["uvicorn", "server:rideapp", "--host", "0.0.0.0", "--port", "8002"]
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8002"]
