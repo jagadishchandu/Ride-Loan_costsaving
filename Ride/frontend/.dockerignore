@@ -1,0 +1,17 @@
+node_modules
+.expo
+.expo-shared
+.metro-cache
+dist
+web-build
+build
+ios
+android
+.git
+.gitignore
+*.log
+.DS_Store
+# Keep .env out of the build — it's the Emergent preview wiring. We supply
+# fresh env via docker-compose for local runs.
+.env
+.env.local

@@ -51,9 +51,68 @@ services:
       - ./frontend:/app
       - /app/node_modules
 
+  ride-backend:
+    build:
+      context: ./Ride/backend
+    container_name: ride_backend
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    env_file:
+      - ./Ride/.env
+    environment:
+      # Override so the backend container talks to the mongo service, not localhost
+      MONGO_URL: "mongodb://mongo:27017"
+    ports:
+      - "8002:8002"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8002/api/').status==200 else 1)\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  ride-frontend:
+    build:
+      context: ./Ride/frontend
+    container_name: ride_frontend
+    restart: unless-stopped
+    depends_on:
+      - ride-backend
+    env_file:
+      - ./Ride/.env
+    environment:
+      # Expo dev server needs to bind to all interfaces inside the container
+      EXPO_DEVTOOLS_LISTEN_ADDRESS: "0.0.0.0"
+      CI: "1"
+      # URL that the bundle should call.
+      #
+      #   - Web (browser on the same machine that ran `docker-compose up`):
+      #     The frontend code (src/backend.ts) detects localhost at runtime
+      #     and rewrites to http://localhost:8001 — this var is ignored.
+      #
+      #   - Expo Go on a phone / EAS build:
+      #     The phone can NOT reach "localhost". Set DOCKER_BACKEND_URL in
+      #     your shell or root .env to the LAN IP of this machine, e.g.
+      #         DOCKER_BACKEND_URL=http://192.168.1.42:8001
+      #     The entrypoint writes that into /app/.env.local so Expo bakes
+      #     it into the bundle for the phone.
+      DOCKER_BACKEND_URL: "${DOCKER_BACKEND_URL:-http://localhost:8002}"
+    ports:
+      - "8082:8082"     # Metro / Expo web
+      - "19008:19008"   # Expo (legacy)
+      - "19005:19005"   # Expo (legacy)
+      - "19006:19006"   # Expo dev tools
+    volumes:
+      - ./Ride/frontend:/app
+      - frontend_node_modules:/app/node_modules
+
 networks:
   lendsplit:
     driver: bridge
 
 volumes:
   mongo_data:
+  ride_mongo_data:
+  frontend_node_modules:
